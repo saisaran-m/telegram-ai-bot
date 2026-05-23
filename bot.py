@@ -6,11 +6,17 @@ from groq import Groq
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
-GROQ_API_KEY = os.environ["GROQ_API_KEY"]
-
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+try:
+    TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
+    GROQ_API_KEY = os.environ["GROQ_API_KEY"]
+except KeyError as e:
+    print(f"CRITICAL ERROR: Missing environment variable {e}", flush=True)
+    logger.critical(f"Missing environment variable {e}")
+    raise e
+
 
 class PingHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -29,7 +35,12 @@ def run_ping_server():
     logger.info(f"Ping server listening on port {port}")
     server.serve_forever()
 
-client = Groq(api_key=GROQ_API_KEY)
+try:
+    client = Groq(api_key=GROQ_API_KEY)
+except Exception as e:
+    print(f"CRITICAL ERROR: Failed to initialize Groq client: {e}", flush=True)
+    logger.critical(f"Failed to initialize Groq client: {e}")
+    raise e
 user_histories = {}
 
 async def start(update, context):
@@ -60,13 +71,19 @@ async def handle_message(update, context):
         logger.error(f"Error: {e}")
         await update.message.reply_text("⚠️ Error. Please try again.")
 
-app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("clear", clear))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+try:
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("clear", clear))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# Start the ping server in a background daemon thread
-threading.Thread(target=run_ping_server, daemon=True).start()
+    # Start the ping server in a background daemon thread
+    threading.Thread(target=run_ping_server, daemon=True).start()
 
-logger.info("Bot is running...")
-app.run_polling()
+    logger.info("Bot is running...")
+    print("Bot is running...", flush=True)
+    app.run_polling()
+except Exception as e:
+    print(f"CRITICAL STARTUP ERROR: {e}", flush=True)
+    logger.critical(f"Critical startup error: {e}")
+    raise e
