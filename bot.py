@@ -1,6 +1,7 @@
 import os
 import logging
 import threading
+import asyncio
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from groq import Groq
 from telegram import Update
@@ -72,6 +73,13 @@ async def handle_message(update, context):
         await update.message.reply_text("⚠️ Error. Please try again.")
 
 try:
+    # Explicitly create and set an event loop for Python 3.12/3.13/3.14 compatibility
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("clear", clear))
